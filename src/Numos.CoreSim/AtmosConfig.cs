@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace Numos.CoreSim;
 
 /// <summary>
@@ -8,7 +10,43 @@ public class AtmosConfig
     /// <summary>
     ///     List of gases actively registered to the sim.
     /// </summary>
-    public List<GasProperties> GasRegistry { get; set; } = [];
+    public IReadOnlyCollection<GasProperties> GasRegistry => _gasRegistryList;
+
+    private readonly HashSet<GasProperties> _gasRegistryList = [];
+
+    private readonly object _registryLockObject = new();
+
+    /// <summary>
+    /// Tries to add a new gas to the registry and marks the config as changed.
+    /// </summary>
+    public bool AddGas(GasProperties newGas){
+        lock(_registryLockObject){
+            if(_gasRegistryList.Add(newGas)){
+                registryVersion++;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Tries to remove a gas from the config and marks the config as changed.
+    /// </summary>
+    public bool RemoveGas(GasProperties gas){
+        lock(_registryLockObject){
+            if(_gasRegistryList.Remove(gas)){
+                registryVersion++;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// A simple counter that is updated if a registry is changed.
+    /// This allows us to quickly check if something like the reaction master matrix needs to be recalculated before a simulation step.
+    /// </summary>
+    public int RegistryVersion { get; private set; }
 
     /// <summary>
     ///     Reference ambient temperature.
